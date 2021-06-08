@@ -17,6 +17,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -x
 
 DEFAULT_CHART_RELEASER_VERSION=v1.2.1
 
@@ -54,10 +55,13 @@ main() {
     local latest_tag
     latest_tag=$(lookup_latest_tag)
 
-    echo "Discovering changed charts since '$latest_tag'..."
-    local changed_charts=()
-    readarray -t changed_charts <<< "$(lookup_changed_charts "$latest_tag")"
+    #echo "Discovering changed charts since '$latest_tag'..."
+    #local changed_charts=()
+    #readarray -t changed_charts <<< "$(lookup_changed_charts "$latest_tag")"
 
+    # XXX HACK
+    # We want to run this against a tag, so just release *all* charts.
+    readarray -t changed_charts <<< "$(list_charts "$latest_tag")"
     if [[ -n "${changed_charts[*]}" ]]; then
         install_chart_releaser
 
@@ -195,8 +199,8 @@ install_chart_releaser() {
         rm -f cr.tar.gz
 
         echo 'Adding cr directory to PATH...'
-        export PATH="$cache_dir:$PATH"
     fi
+    export PATH="$cache_dir:$PATH"
 }
 
 lookup_latest_tag() {
@@ -217,6 +221,11 @@ filter_charts() {
            echo "WARNING: $file is missing, assuming that '$chart' is not a Helm chart. Skipping." 1>&2
         fi
     done
+}
+
+list_charts() {
+    local commit="$1"
+    git ls-tree --name-only "$commit" "$charts_dir/" | uniq | filter_charts
 }
 
 lookup_changed_charts() {
